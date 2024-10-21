@@ -1,5 +1,5 @@
-// FIXME: Parking it for now, it's beside the scope of this project
-// $ deno run -A src/tts.ts                                                                          [10:41:02]
+// FIXME: Parking this for now, it's beside the scope of this project
+// $ deno run -A src/tts.ts
 // Downloading piper_linux_x86_64.tar.gz to $HOME/piperTTS/...
 // Extract piper_linux_x86_64.tar.gz
 // Make piper_linux_x86_64.tar.gz executable...
@@ -11,9 +11,8 @@
 //     at async Object.chmod (ext:deno_fs/30_fs.js:107:3)
 //     at async installPiper (file://scribe_cast/src/tts.ts:262:9)
 
-import { exists } from "https://deno.land/std/fs/mod.ts";
 import { TarStreamEntry, UntarStream } from "jsr:@std/tar/untar-stream";
-import { dirname, join, normalize } from "https://deno.land/std/path/mod.ts";
+import { dirname, normalize } from "https://deno.land/std/path/mod.ts";
 import { decompress } from "https://deno.land/x/zip/mod.ts";
 import { ensureDir } from "https://deno.land/std/fs/mod.ts";
 

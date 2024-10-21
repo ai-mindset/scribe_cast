@@ -14,13 +14,14 @@ $ mkdir models/ # Create a models directory to save voice models and configurati
 ```console
 $ cd models/
 $ curl -L -O https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alba/medium/en_GB-alba-medium.onnx # Download voice model 
-$ curl -L -O https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alba/medium/en_GB-alba-medium.onnx.json # Download config 
+$ curl -L -O https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_GB/alba/medium/en_GB-alba-medium.onnx.json # Download model config 
 ```
 
-### Usage
+### Usage from CLI
 `piper` can be run for Text-To-Speech (TTS) as follows:  
 ```console
-$ cat my_file.md | ./piper --model en_GB-alba-medium.onnx --output_file my_file.wav # Save to .wav # Save speech to file
+# Save speech to file
+$ cat my_file.md | ./piper --model en_GB-alba-medium.onnx --output_file my_file.wav 
 $ # Optionally, convert to .mp3 with ffmpeg
 $ ffmpeg -i my_file.wav -vn -ar 44100 -ac 2 -b:a 192k my_file.mp3
 ```
@@ -28,7 +29,8 @@ $ ffmpeg -i my_file.wav -vn -ar 44100 -ac 2 -b:a 192k my_file.mp3
 or  
 
 ```console
+# Stream to stdout
 $ cat my_file.md | ./piper --model en_GB-alba-medium..onnx --output-raw | \
-  aplay -r 22050 -f S16_LE -t raw - # Stream speechto stdout 
+  aplay -r 22050 -f S16_LE -t raw - 
 ```
 

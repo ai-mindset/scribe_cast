@@ -7,7 +7,7 @@
       "compile:macos-arm": "deno compile --allow-run --allow-write --target aarch64-apple-darwin -o release/yt-dlp-hq-arm-mac main.ts",
       "compile:linux-intel": "deno compile --allow-run --allow-write --target x86_64-unknown-linux-gnu -o release/yt-dlp-hq-intel-linux main.ts",
       "compile:linux-arm": "deno compile --allow-run --allow-write --target aarch64-unknown-linux-gnu -o release/yt-dlp-hq-arm-linux main.ts",
-    "dev": "deno run --watch main.ts",
+    "dev": "deno run --watch src/main.ts",
     "lint": "deno lint",
     "fmt": "deno fmt"
   },
