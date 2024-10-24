@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PDF Summarizer</title>
+        <style>
+body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+        #drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 480px;
+            padding: 20px;
+            text-align: center;
+        }
+        #drop-area.highlight {
+            border-color: purple;
+        }
+        #summaries {
+            margin-top: 20px;
+        }
+        .summary {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        </style>
+    </head>
+    <body>
+        <h1>PDF Summarizer</h1>
+        <div id="drop-area">
+            <p>Drag and drop PDF files here or click to select files</p>
+            <input type="file" id="fileElem" multiple accept="application/pdf">
+        </div>
+        <div id="summaries"></div>
+
+        <script>
+            let dropArea = document.getElementById('drop-area');
+            let fileElem = document.getElementById('fileElem');
+            let summariesDiv = document.getElementById('summaries');
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight(e) {
+                dropArea.classList.add('highlight');
+            }
+
+            function unhighlight(e) {
+                dropArea.classList.remove('highlight');
+            }
+
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                let dt = e.dataTransfer;
+                let files = dt.files;
+                handleFiles(files);
+            }
+
+            fileElem.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+
+            function handleFiles(files) {
+                let formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('file' + i, files[i]);
+                }
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(summaries => {
+                        summariesDiv.innerHTML = '';
+                        summaries.forEach((summary, index) => {
+                            let div = document.createElement('div');
+                            div.className = 'summary';
+                            div.innerHTML = `<h3>${index + 1}. Summary</h3><p>${summary}</p>`;
+                            summariesDiv.appendChild(div);
+                        });
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        </script>
+    </body>
+</html>
