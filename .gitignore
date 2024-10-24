@@ -1,2 +1,7 @@
-text.md
 deno.lock
+**/.deno_lsp/
+.deno_lsp/
+**/.vscode/
+.vscode/
+node_modules/
+
