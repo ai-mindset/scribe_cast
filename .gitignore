@@ -2,5 +2,7 @@
 .vscode/
 **/.deno_lsp/*
 **/.vscode/*
+data/
 text.md
 deno.lock
+node_modules/
