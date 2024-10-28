@@ -11,7 +11,8 @@
         "dev:qdrant": "deno run -A --watch src/qdrantdb.ts",
         "db:qdrant": "podman run -p 6333:6333 qdrant/qdrant",
         "lint": "deno lint",
-        "fmt": "deno fmt"
+        "fmt": "deno fmt",
+        "test": "deno test --allow-write --allow-read"
     },
     "imports": {
         "@oak/oak": "jsr:@oak/oak@^17.1.2",

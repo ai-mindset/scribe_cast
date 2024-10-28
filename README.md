@@ -33,7 +33,7 @@ $ cat my_file.md | ./piper --model models/en_GB-alba-medium..onnx --output-raw |
 ```
 
 ### [Podman](https://podman.io/docs/installation)
-You'll need to have a container engine installed, should you want to locally install some vector DBs such as Qdrant, Milvus, LanceDB or Weaviate among others.
+You'll need to have a container engine installed, should you want to locally install a Vector DB such as Qdrant, Milvus, Weaviate etc.
 
 
 ### VectorDBs
@@ -56,7 +56,7 @@ $ podman run -p 6333:6333 qdrant/qdrant
 ```
 
 #### [MongoDB](https://www.mongodb.com/products/self-managed/community-edition)
-Edgar Dijkstra was known for advocating for simplicity _"Simplicity is prerequisite for reliability."_. To avoid unnecessary moving parts in an application, another database solution that offers both graph and vector search is the excellent MongoDB.
+_"Simplicity is prerequisite for reliability."_ per Edgar Dijkstra. To avoid unnecessary moving parts in an application, another database solution that offers both graph and vector search is the excellent MongoDB.
 Pros:  
 - Simple setup
 - Familiar for developers
@@ -68,7 +68,7 @@ Cons:
 
 
 ## Architecture
-Here's what I've come up with   
+Inspired by the very recent [NotebookLlama](https://github.com/meta-llama/llama-recipes/tree/main/recipes/quickstart/NotebookLlama), I'm designing my system as follows  
 ```mermaid
 flowchart TD
     subgraph Input

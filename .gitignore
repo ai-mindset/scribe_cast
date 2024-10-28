@@ -3,6 +3,6 @@
 **/.deno_lsp/*
 **/.vscode/*
 data/
-text.md
+test/
 deno.lock
 node_modules/
