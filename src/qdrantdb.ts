@@ -1,34 +1,13 @@
-import { QdrantClient } from "npm:@qdrant/js-client-rest";
+import { CONFIG, QdrantClient, vectorStore } from "./deps.ts";
 
 /**
- * Configuration type for Qdrant connection
- */
-type QdrantConfig = {
-    host: string;
-    port: number;
-    collection: string;
-    vectorSize: number;
-};
-
-/**
- * Creates and returns a configured Qdrant client
- * @param config Configuration parameters for Qdrant
- * @returns Configured QdrantClient instance
- */
-function createQdrantClient(config: QdrantConfig): QdrantClient {
-    return new QdrantClient({
-        url: `http://${config.host}:${config.port}`,
-    });
-}
-
-/**
- * Initializes a collection in Qdrant with specified parameters
+ * initialises a collection in Qdrant with specified parameters
  * @param client QdrantClient instance
- * @param collectionName Name of the collection to initialize
+ * @param collectionName Name of the collection to initialise
  * @param vectorSize Size of the vectors to store
  * @returns Promise that resolves when initialization is complete
  */
-async function initializeCollection(
+async function initialiseCollection(
     client: QdrantClient,
     collectionName: string,
     vectorSize: number,
@@ -39,10 +18,6 @@ async function initializeCollection(
                 size: vectorSize,
                 distance: "Cosine",
             },
-            optimizers_config: {
-                default_segment_number: 2,
-            },
-            replication_factor: 1,
         });
     } catch (error: unknown) {
         if (!error.toString().includes("already exists")) {
@@ -92,8 +67,8 @@ async function searchSimilar(
     collectionName: string,
     vector: number[],
     limit = 5,
-) // TODO: return type(s)?
-{
+) {
+    // TODO: return type(s)?
     const results = await client.search(collectionName, {
         vector,
         limit,
@@ -163,8 +138,8 @@ async function searchSimilarWithFilter(
     vector: number[],
     filter: Record<string, string>,
     limit: number = 5,
-) // TODO: return type?
-{
+) {
+    // TODO: return type?
     const results = await client.search(collectionName, {
         vector,
         filter,
@@ -179,58 +154,71 @@ async function searchSimilarWithFilter(
 }
 
 // =======================================================================================
-const config: QdrantConfig = {
-    host: "localhost",
-    port: 6333,
-    collection: "pdf_summaries",
-    vectorSize: 4096, // for avr/sfr-embedding-mistral:latest
-};
-
 async function example(): Promise<void> {
-    const client = createQdrantClient(config);
-    await initializeCollection(client, config.collection, config.vectorSize);
+    await initialiseCollection(
+        vectorStore,
+        CONFIG.COLLECTION_NAME,
+        CONFIG.VECTOR_SIZE,
+    );
 
     // Store a single vector
-    const vector = new Array(config.vectorSize).fill(0).map(() =>
+    const vector = new Array(CONFIG.VECTOR_SIZE).fill(0).map(() =>
         Math.random()
     );
     const metadata = { summary: "Example summary", fileName: "test.pdf" };
-    const id = await storeVector(client, config.collection, vector, metadata);
+    const id = await storeVector(
+        vectorStore,
+        CONFIG.COLLECTION_NAME,
+        vector,
+        metadata,
+    );
+    concole.log(
+        `Vector of length ${vector.length}, with metadata ${metadata} and ID ${id} was stored in collection`,
+    );
 
     // Search for similar vectors
-    const similarDocs = await searchSimilar(client, config.collection, vector);
+    const similarDocs = await searchSimilar(
+        vectorStore,
+        CONFIG.COLLECTION_NAME,
+        vector,
+    );
+    console.log(`Similar doc(s): ${similarDocs}`);
 
     // Example with filtering
     const filteredDocs = await searchSimilarWithFilter(
-        client,
-        config.collection,
+        vectorStore,
+        CONFIG.COLLECTION_NAME,
         vector,
         { fileName: "test.pdf" },
     );
+    console.log(`Filtered doc(s): ${filteredDocs}`);
 
     // Batch store example
     const batchVectors = [
         {
-            vector: new Array(config.vectorSize).fill(0).map(() =>
+            vector: new Array(CONFIG.VECTOR_SIZE).fill(0).map(() =>
                 Math.random()
             ),
             metadata: { summary: "Doc 1" },
         },
         {
-            vector: new Array(config.vectorSize).fill(0).map(() =>
+            vector: new Array(CONFIG.VECTOR_SIZE).fill(0).map(() =>
                 Math.random()
             ),
             metadata: { summary: "Doc 2" },
         },
     ];
     const batchIds = await batchStoreVectors(
-        client,
-        config.collection,
+        vectorStore,
+        CONFIG.COLLECTION_NAME,
         batchVectors,
     );
+    console.log(`Batch vectors ${batchVectors} with IDs ${batchIds}`);
 
     // Cleanup
-    await deleteVector(client, config.collection, id);
+    await deleteVector(vectorStore, CONFIG.COLLECTION_NAME, id);
+
+    console.log(`Vector with id ${id} was deleted`);
 }
 
 // ===============================================================================
