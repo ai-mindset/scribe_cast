@@ -6,7 +6,7 @@ import {
     getResolvedPDFJS,
     QdrantVectorStore,
     VectorStoreIndex,
-} from "./deps.ts";
+} from "./src/deps.ts";
 
 interface ParseCache {
     [filePath: string]: {

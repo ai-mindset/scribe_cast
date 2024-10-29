@@ -1,108 +1,79 @@
-import { parse } from "jsr:@std/flags";
-import { readTextFile } from "jsr:@std/fs";
-import { encodeBase64 } from "jsr:@std/encoding/base64";
+import { parse } from ".deps.ts";
+import { PDFProcessor } from "./pdf_processor.ts";
 
-/**
- * Main function to run the CLI tool
- */
+type ProcessResult = {
+    source: string;
+    summary?: string;
+    error?: string;
+};
+
 async function main() {
-    const args = parse(Deno.args);
-    const inputFile = args.input as string;
+    const flags = parse(Deno.args, {
+        string: ["urls", "files"],
+        alias: { u: "urls", f: "files" },
+    });
 
-    if (!inputFile) {
-        console.error("Please provide an input file using --input flag");
+    if (!flags.urls && !flags.files) {
+        console.error(`Usage:
+    Process URLs:    deno run --allow-net --allow-read cli.ts -u "url1,url2,..."
+    Process Files:   deno run --allow-net --allow-read cli.ts -f "path1,path2,..."`);
         Deno.exit(1);
     }
 
-    const text = await readTextFile(inputFile);
-    const discussion = await generateDiscussion(text);
-    const audio = await textToSpeech(discussion);
+    const vectorStore = new QdrantStore();
+    const processor = new PDFProcessor(vectorStore);
+    let results: ProcessResult[] = [];
 
-    await Deno.writeFile("output.mp3", audio);
-    console.log("Audio file generated: output.mp3");
-}
+    try {
+        if (flags.urls) {
+            const urls = flags.urls.split(",").slice(0, 5);
+            console.log(`Processing ${urls.length} URLs...`);
+            results = await Promise.all(
+                urls.map(async (url: string): Promise<ProcessResult> => {
+                    try {
+                        const text = await processor.processURLPDF(url);
+                        const summary = await processor.generateSummary(text);
+                        return { source: url, summary };
+                    } catch (error) {
+                        return { source: url, error: error.message };
+                    }
+                }),
+            );
+        }
 
-/**
- * Generate a discussion between two AI agents based on the input text
- * @param text The input text to discuss
- * @returns A string containing the generated discussion
- */
-async function generateDiscussion(text: string): Promise<string> {
-    const agent1 = await createAgent("agent1", text);
-    const agent2 = await createAgent("agent2", text);
+        if (flags.files) {
+            const files = flags.files.split(",").slice(0, 5);
+            console.log(`Processing ${files.length} files...`);
+            results = await Promise.all(
+                files.map(async (path: string): Promise<ProcessResult> => {
+                    try {
+                        const data = await Deno.readFile(path);
+                        const text = await processor.processPDFData(data);
+                        const summary = await processor.generateSummary(text);
+                        return { source: path, summary };
+                    } catch (error) {
+                        return { source: path, error: error.message };
+                    }
+                }),
+            );
+        }
 
-    let discussion = "";
-    let turn = 0;
-    const maxTurns = 10; // Adjust this to control discussion length
-
-    while (turn < maxTurns) {
-        const speaker = turn % 2 === 0 ? agent1 : agent2;
-        const response = await getAgentResponse(speaker, discussion);
-        discussion += `${speaker.name}: ${response}\n\n`;
-        turn++;
+        // Display results
+        results.forEach(({ source, summary, error }) => {
+            console.log("\n-----------------------------------");
+            console.log(`Source: ${source}`);
+            if (error) {
+                console.error(`Error: ${error}`);
+            } else {
+                console.log(`Summary: ${summary}`);
+            }
+        });
+    } catch (error) {
+        console.error("Processing failed:", error.message);
+        Deno.exit(1);
     }
-
-    return discussion;
 }
 
-/**
- * Create an AI agent with a specific role
- * @param name The name of the agent
- * @param text The input text for context
- * @returns An object representing the AI agent
- */
-async function createAgent(name: string, text: string) {
-    const system = name === "agent1"
-        ? "You are an AI assistant tasked with discussing the main points of a given text. Be precise, informative, and engaging."
-        : "You are an AI assistant tasked with commenting on and extending the discussion about a given text. Be insightful and promote further discussion.";
-
-    return { name, system, context: text };
-}
-
-/**
- * Get a response from an AI agent
- * @param agent The AI agent object
- * @param discussion The current state of the discussion
- * @returns A string containing the agent's response
- */
-async function getAgentResponse(
-    agent: { name: string; system: string; context: string },
-    discussion: string,
-): Promise<string> {
-    const response = await fetch("http://localhost:11434/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: "mistral-nemo:latest",
-            messages: [
-                { role: "system", content: agent.system },
-                {
-                    role: "user",
-                    content:
-                        `Context: ${agent.context}\n\nCurrent discussion: ${discussion}\n\nPlease continue the discussion.`,
-                },
-            ],
-            stream: false,
-        }),
-    });
-
-    const data = await response.json();
-    return data.message.content;
-}
-
-/**
- * Convert text to speech using PipedTTS
- * @param text The text to convert to speech
- * @returns A Uint8Array containing the audio data
- */
-async function textToSpeech(text: string): Promise<Uint8Array> {
-    // This is a placeholder for the actual PipedTTS implementation
-    // You would need to integrate with a TTS service or library here
-    console.log("Text-to-speech conversion not implemented");
-    return new Uint8Array();
-}
-
-// Run the main function
 if (import.meta.main) {
-    main();
+    await main();
 }
