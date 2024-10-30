@@ -1,10 +1,11 @@
 import { assertEquals, assertExists, assertRejects } from "@std/assert";
-import { ensureCacheFile, isValidCache, simpleCaching, isStale, loadFromCache } from "./llamaindex.ts";
+import { ensureCacheFile, isValidCache, readFromCache, processPDF } from "./llamaindex.ts";
 import { PDFDocument, StandardFonts } from "npm:pdf-lib";
 
-const TEST_DIR = "./test"
-const TEST_CACHE = `${TEST_DIR}/test_cache.json`;
-const TEST_PDF = `${TEST_DIR}/sample.pdf`;
+const TEST_DIR: string = "./test"
+const TEST_CACHE: string = `${TEST_DIR}/test_cache.json`;
+const TEST_PDF_PATH: string = `${TEST_DIR}/sample.pdf`;
+const PDF_CONTENT: string = "content";
 
 async function createTestPDF(path: string, content: string) {
     const doc = await PDFDocument.create();
@@ -26,9 +27,7 @@ async function createTestPDF(path: string, content: string) {
  * Creates sample PDF for testing
  * @returns Path to created test PDF
  */
-async function createSamplePdf(): Promise<string> {
-    const pdfContent = "cached content";
-
+async function createSamplePdf(): Promise<void> {
     // Ensure test directory exists
     try {
         await Deno.stat(TEST_DIR);
@@ -36,10 +35,8 @@ async function createSamplePdf(): Promise<string> {
         await Deno.mkdir(TEST_DIR, { recursive: true });
     }
 
-    await createTestPDF(TEST_PDF, pdfContent);
-    return TEST_PDF;
+    await createTestPDF(TEST_PDF_PATH, PDF_CONTENT);
 }
-
 
 async function cleanup() {
     try {
@@ -64,19 +61,11 @@ Deno.test("isValidCache validates structure", () => {
     assertEquals(isValidCache({}), true);
 });
 
-Deno.test("isStale handles timestamps", () => {
-    const now = Date.now();
-    assertEquals(isStale(now), false);
-    assertEquals(isStale(now - (25 * 60 * 60 * 1000)), true);
-    assertEquals(isStale(0), true);
-    assertEquals(isStale(now + 1000), false);  // Future timestamp
-});
-
 // Edge cases and error handling
 Deno.test("simpleCaching handles corrupt JSON", async () => {
     await cleanup();
     await Deno.writeTextFile(TEST_CACHE, "{ bad json }");
-    const cache = await simpleCaching(TEST_CACHE);
+    const cache = await readFromCache(TEST_CACHE);
     assertEquals(cache, {});
 });
 
@@ -84,12 +73,12 @@ Deno.test("simpleCaching handles read-only filesystem", async () => {
     await cleanup();
     await Deno.writeTextFile(TEST_CACHE, "{}");
     await Deno.chmod(TEST_CACHE, 0o444);  // Read-only
-    const cache = await simpleCaching(TEST_CACHE);
+    const cache = await readFromCache(TEST_CACHE);
     assertEquals(cache, {});
 });
 
 Deno.test("simpleCaching handles missing directory", async () => {
-    const cache = await simpleCaching("/nonexistent/cache.json");
+    const cache = await readFromCache("/nonexistent/cache.json");
     assertEquals(cache, {});
 });
 
@@ -100,32 +89,31 @@ Deno.test("simpleCaching handles invalid cache entries", async () => {
         "invalid": "not an object",
         "missing": { content: "test" }  // no timestamp
     }));
-    const cache = await simpleCaching(TEST_CACHE);
+    const cache = await readFromCache(TEST_CACHE);
     assertEquals(Object.keys(cache).length, 1);
     assertExists(cache["valid"]);
 });
 
-Deno.test("loadFromCache loads and caches new PDF", async () => {
-    // await cleanup();
 
-    const docs = await loadFromCache([TEST_PDF]);
-    assertEquals(docs.length, 1);
-    const cache = JSON.parse(await Deno.readTextFile(TEST_CACHE));
-    assertExists(cache["valid"]);
-});
-
-Deno.test("loadFromCache uses cached content", async () => {
-    await cleanup();
+Deno.test("processes valid PDF file", async () => {
     await createSamplePdf();
-
-    const docs = await loadFromCache([TEST_PDF]);
-    assertEquals(docs[0], "cached content\n");
+    const result = await processPDF(TEST_PDF_PATH);
+    assertEquals(result, PDF_CONTENT);
+    await Deno.remove(TEST_PDF_PATH);
 });
 
-Deno.test("loadFromCache handles missing PDF", async () => {
-    await cleanup();
+Deno.test("returns null for non-existent file", async () => {
+    const result = await processPDF("nonexistent.pdf");
+    assertEquals(result, null);
+});
+
+Deno.test("throws on unexpected filesystem errors", async () => {
+    // Create a problematic file that triggers permission error
+    const filePath = "/root/test.pdf";
+
     await assertRejects(
-        () => loadFromCache(["nonexistent.pdf"]),
-        Error
+        () => processPDF(filePath),
+        Error,
+        "Permission denied"
     );
 });

@@ -6,7 +6,7 @@ import {
     getResolvedPDFJS,
     QdrantVectorStore,
     VectorStoreIndex,
-} from "./src/deps.ts";
+} from "./deps.ts";
 
 interface ParseCache {
     [filePath: string]: {
@@ -17,7 +17,7 @@ interface ParseCache {
 
 /**
  * Ensures cache file exists, creates if missing
- * @param cachePath - Optional custom path for cache file. Defaults to CONFIG.PARSING_CACHE
+ * @param cachePath - Custom path for cache file
  * @throws {Error} If directory creation or file access fails
  */
 export async function ensureCacheFile(cachePath: string): Promise<void> {
@@ -29,17 +29,6 @@ export async function ensureCacheFile(cachePath: string): Promise<void> {
         console.log(`Created ${cachePath}`);
     }
 }
-
-// /**
-// * Type guard ensuring data is a non-null object (not array)
-// */
-// export function isValidCache(data: unknown): data is ParseCache {
-//     return (
-//         data !== null &&
-//         typeof data === "object" &&
-//         !Array.isArray(data)
-//     );
-// }
 
 /**
  * Type guard validating cache entries match ParseCache structure
@@ -64,9 +53,11 @@ export function isValidCache(data: unknown): data is ParseCache {
 
 /**
  * Retrieves and validates cached parsing data from filesystem.
+ * @param cachePath - Optional custom path for cache file. Defaults to CONFIG.PARSING_CACHE
+ * @returns ParseCache object with cached PDF content
  * @throws {Error} If cache file exists but is invalid/corrupt
  */
-export async function simpleCaching(cachePath?: string): Promise<ParseCache> {
+export async function readFromCache(cachePath?: string): Promise<ParseCache> {
     const cache: ParseCache = {};
     const path = cachePath || CONFIG.PARSING_CACHE;
 
@@ -102,63 +93,75 @@ export async function simpleCaching(cachePath?: string): Promise<ParseCache> {
 }
 
 /**
- * Checks if cached data is older than 24 hours
+ * Saves content to cache file, creating new cache if none exists
+ * @param cachePath - Path to cache file
+ * @param filePath - PDF file path to use as cache key
+ * @param content - Text content to cache
+ * @throws {Error} If cache file operations fail
  */
-export function isStale(timestamp: number): boolean {
-    const ONE_DAY = 24 * 60 * 60 * 1000;
-    return Date.now() - timestamp > ONE_DAY;
+export async function saveToCache(
+    cachePath: string,
+    filePath: string,
+    content: string
+): Promise<void> {
+    let cache: ParseCache = {};
+
+    try {
+        const existing = await Deno.readTextFile(cachePath);
+        cache = JSON.parse(existing);
+    } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+            throw error;
+        }
+    }
+
+    cache[filePath] = {
+        content,
+        timestamp: Date.now()
+    };
+
+    await Deno.writeTextFile(cachePath, JSON.stringify(cache));
 }
 
 /**
- * Loads and caches PDF documents locally, using unpdf
- * @throws {Error} If PDF reading or parsing fails
+ * Extracts text from a PDF file
+ * @param filePath Path to the PDF file
+ * @param cache Current cache object
+ * @returns Extracted text or null if file doesn't exist
  */
-export async function loadFromCache(filesToParse: string[]): Promise<string[]> {
-    const cache: ParseCache = await simpleCaching();
-    const documents: string[] = [];
+export async function processPDF(
+    filePath: string,
+): Promise<string> {
+
     const { getDocument } = await getResolvedPDFJS();
-
     try {
-        for (const f of filesToParse) {
-            const fullPath = f.split("/");
-            const file = fullPath[fullPath.length - 1].split(".pdf")[0];
-            if (!cache[file]) {
-                const pdfBytes = await Deno.readFile(f);
-                const doc = await getDocument(pdfBytes).promise;
-                const { text } = await extractText(doc, { mergePages: true });
-                const content = text;
-
-                cache[file] = { content, timestamp: Date.now() };
-            } else {
-                const cached = cache[file];
-                if (isValidCache(cached)) {
-                    documents.push(cached.content);
-                } else {
-                    const pdfBytes = await Deno.readFile(f);
-                    const doc = await getDocument(pdfBytes).promise;
-                    let content = "";
-
-                    for (let i = 1; i <= doc.numPages; i++) {
-                        const page = await doc.getPage(i);
-                        const textContent = await page.getTextContent();
-                        content += textContent.items.map((item) =>
-                            item.str
-                        ).join(" ") + "\n";
-                    }
-
-                    documents.push(content);
-                    cache[f] = { content, timestamp: Date.now() };
-                }
-            }
-        }
-
-        await Deno.writeTextFile(CONFIG.PARSING_CACHE, JSON.stringify(cache));
-        return documents;
+        // Check if file exists
+        await Deno.stat(filePath);
     } catch (error) {
-        console.error("Failed to load or parse documents:", error);
+        if (error instanceof Deno.errors.NotFound) {
+            console.error(`PDF file not found: ${filePath}`);
+            return "";
+        }
         throw error;
     }
+
+    // Extract text from PDF
+    try {
+        const pdfBytes = await Deno.readFile(filePath);
+        const doc = await getDocument(pdfBytes).promise;
+        const { text } = await extractText(doc, { mergePages: true });
+
+        return text;
+    } catch (error) {
+        console.error(`Failed to process PDF ${filePath}:`, error);
+        return null;
+    }
 }
+
+
+
+
+
 
 // async function temp() {
 //     const pathFile = "node_modules/llamaindex/examples/abramov.txt";
@@ -187,6 +190,9 @@ export async function loadFromCache(filesToParse: string[]): Promise<string[]> {
 // }
 
 if (import.meta) {
-    const filesToParse = ["./data/1706.03762.pdf", "./data/2410.16928.pdf"];
-    await loadFromCache(filesToParse);
+    const files: Array<string> = ["./data/1706.03762.pdf", "./data/2410.16928.pdf"];
+    const fileNames: Array<string> = files.map(path => path.split('/').pop()?.split('.pdf')[0] ?? '');
+    const cache = "./data/cache.json";
+    const text = await processPDF(files[1]);
+    saveToCache(cache, fileNames[0], text)
 }
