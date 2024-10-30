@@ -154,7 +154,7 @@ export async function processPDF(
         return text;
     } catch (error) {
         console.error(`Failed to process PDF ${filePath}:`, error);
-        return null;
+        return "";
     }
 }
 
