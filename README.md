@@ -1,2 +1,4 @@
 # scribe_cast
-Document-to-Dialogue Translator
+Document-to-Dialogue
+
+🚧 WIP. Stay tuned 🚧
